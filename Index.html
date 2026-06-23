@@ -1,0 +1,1396 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <title>CBT Ujian Harian XI TJKT 2 - Firebase</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+    <style>
+        :root {
+            --blue: #4f7ffd;
+            --blue-dark: #3f6bff;
+            --danger: #ff4b4b;
+            --muted: #6b7280;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --dark-blue: #1e3c72;
+            --light-blue: #2a5298;
+            --purple: #8b5cf6;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        /* SPLASH */
+        .splash-screen {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(135deg, var(--dark-blue), var(--light-blue));
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            color: white; padding: 20px; z-index: 1000;
+            transition: opacity 0.5s ease, visibility 0.5s ease;
+        }
+        .splash-screen.hide { opacity: 0; visibility: hidden; }
+        .top-banner {
+            background: rgba(0,0,0,0.5); backdrop-filter: blur(8px);
+            padding: 10px 20px; border-radius: 40px; font-size: 14px;
+            margin-bottom: 30px; text-align: center; display: inline-block;
+        }
+        .splash-container { width: 100%; max-width: 420px; text-align: center; animation: fadeInUp 1s ease-in-out; }
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .progress-container { width: 100%; height: 8px; background: rgba(255,255,255,0.3); border-radius: 20px; overflow: hidden; margin: 20px 0; }
+        .progress-bar { width: 0%; height: 100%; background: #00e0ff; animation: loading 2s linear forwards; }
+        @keyframes loading { to { width: 100%; } }
+        .loading-text { font-size: 14px; opacity: 0.9; letter-spacing: 1px; }
+        .splash-footer { position: fixed; bottom: 12px; left: 0; right: 0; text-align: center; font-size: 12px; opacity: 0.85; }
+
+        /* FIREBASE STATUS BANNER */
+        #fbStatusBanner {
+            position: fixed; top: 0; left: 0; right: 0; z-index: 9990;
+            padding: 8px 16px; text-align: center; font-size: 13px; font-weight: bold;
+            display: none;
+        }
+        #fbStatusBanner.connecting { background: #fef3c7; color: #92400e; display: block; }
+        #fbStatusBanner.connected { background: #d1fae5; color: #065f46; display: block; }
+        #fbStatusBanner.error { background: #fee2e2; color: #991b1b; display: block; }
+
+        /* APP */
+        .cbt-app { display: none; }
+        .center-screen {
+            min-height: 100vh; display: flex; align-items: center; justify-content: center;
+            background: linear-gradient(135deg, var(--blue), #5e8bff); padding: 20px;
+        }
+        .login-box {
+            width: 90%; max-width: 380px; background: white; padding: 28px;
+            border-radius: 14px; box-shadow: 0 10px 40px rgba(0,0,0,0.25); text-align: center;
+        }
+        .login-box h2 { margin-bottom: 20px; color: var(--dark-blue); }
+        .input {
+            width: 100%; padding: 12px 14px; border-radius: 10px; border: none;
+            background: #f3f4f6; margin-bottom: 12px; font-size: 15px; font-family: inherit;
+        }
+        .input:focus { outline: 2px solid var(--blue); background: white; }
+        .btn {
+            width: 100%; padding: 12px; border-radius: 10px; border: none;
+            background: var(--blue-dark); color: white; font-weight: 600;
+            cursor: pointer; transition: 0.3s; font-size: 16px;
+        }
+        .btn:hover { opacity: 0.9; transform: scale(0.98); }
+        .btn-small {
+            padding: 8px 12px; border-radius: 8px; border: none; cursor: pointer;
+            margin: 4px; font-size: 13px; font-weight: 500; transition: 0.2s;
+        }
+        .btn-small:hover { opacity: 0.8; }
+        .btn-add { background: var(--blue); color: white; }
+        .btn-delete { background: #374151; color: white; }
+        .btn-export { background: var(--success); color: white; }
+        .btn-import { background: var(--purple); color: white; }
+        .btn-refresh { background: var(--warning); color: white; }
+        .btn-danger { background: var(--danger); color: white; }
+        .small { font-size: 13px; color: var(--muted); }
+        .text-center { text-align: center; }
+        .app { display: none; padding: 20px; min-height: 100vh; background: #f4f6fb; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .header {
+            display: flex; align-items: center; justify-content: space-between;
+            margin-bottom: 12px; background: white; padding: 12px 18px;
+            border-radius: 12px; flex-wrap: wrap; gap: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+        .card { background: white; padding: 18px; border-radius: 12px; box-shadow: 0 6px 22px rgba(0,0,0,0.06); margin-bottom: 18px; }
+        .card h3 { margin-bottom: 12px; color: var(--dark-blue); }
+        .card h4 { margin-bottom: 10px; color: var(--blue-dark); }
+        hr { margin: 16px 0; border: none; border-top: 1px solid #e5e7eb; }
+        .table { width: 100%; border-collapse: collapse; margin-top: 10px; overflow-x: auto; display: block; }
+        .table th, .table td { padding: 10px; border-bottom: 1px solid #eee; text-align: left; }
+        .table th { background: #eaf2ff; font-weight: 600; }
+        .subject-card {
+            background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 10px;
+            padding: 12px; margin-bottom: 12px; display: flex;
+            justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;
+        }
+        .subject-card b { font-size: 16px; }
+        .badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: bold; }
+        .badge-success { background: #d1fae5; color: #065f46; }
+        .badge-warning { background: #fed7aa; color: #92400e; }
+        .badge-danger { background: #fee2e2; color: #991b1b; }
+        .modal {
+            position: fixed; left: 0; top: 0; width: 100%; height: 100%;
+            display: none; align-items: center; justify-content: center;
+            background: rgba(0,0,0,0.45); z-index: 1001;
+        }
+        .modal .modal-content {
+            background: white; padding: 20px; border-radius: 10px;
+            width: 90%; max-width: 900px; max-height: 80vh; overflow-y: auto;
+        }
+        .modal h3 { margin-bottom: 16px; }
+        .sync-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white; padding: 15px; border-radius: 12px; margin-bottom: 15px;
+        }
+        .soal {
+            background: white; padding: 14px; border-radius: 10px; margin-bottom: 12px;
+            box-shadow: 0 4px 14px rgba(0,0,0,0.04); border: 1px solid #eef2ff;
+        }
+        .soal strong { display: block; margin-bottom: 10px; }
+        .options label { display: block; margin-bottom: 8px; cursor: pointer; padding: 6px 10px; border-radius: 8px; transition: background 0.2s; }
+        .options label:hover { background: #f0f4ff; }
+        .options input[type="radio"] { margin-right: 10px; }
+        .essay textarea { width: 100%; min-height: 120px; padding: 12px; border-radius: 8px; border: 1px solid #e5e7eb; font-family: inherit; font-size: 14px; }
+        .essay textarea:focus { outline: 2px solid var(--blue); }
+        .qr-container { text-align: center; padding: 20px; background: white; border-radius: 12px; }
+        .qr-code { display: flex; justify-content: center; margin: 15px 0; }
+        .share-link { word-break: break-all; font-size: 12px; }
+        @keyframes shameFlash {
+            0% { background-color: #ffebee; }
+            50% { background-color: #ff4b4b; color: white; }
+            100% { background-color: #ffebee; }
+        }
+        .shame-effect { animation: shameFlash 0.5s ease-in-out 3; box-shadow: 0 0 0 3px red; }
+        .shame-toast {
+            position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
+            background: #dc2626; color: white; padding: 12px 24px; border-radius: 50px;
+            font-weight: bold; z-index: 9999; box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            animation: slideUp 0.3s ease; text-align: center; font-size: 14px; max-width: 90%;
+        }
+        @keyframes slideUp {
+            from { transform: translate(-50%, 100px); opacity: 0; }
+            to { transform: translate(-50%, 0); opacity: 1; }
+        }
+        .camera-preview { width: 100%; max-width: 300px; border-radius: 10px; margin: 10px auto; display: block; background: #000; }
+        .photo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-top: 10px; }
+        .photo-item { border: 1px solid #ddd; border-radius: 8px; padding: 8px; text-align: center; }
+        .photo-item img { width: 100%; border-radius: 5px; }
+        .photo-item .small { font-size: 10px; color: gray; }
+        #qr-reader { width: 100%; max-width: 350px; margin: 0 auto; }
+        #qr-reader video { width: 100%; border-radius: 10px; }
+        .login-options { display: flex; gap: 10px; margin-top: 15px; flex-wrap: wrap; }
+        .btn-scan-qr { background: linear-gradient(135deg, #667eea, #764ba2); color: white; }
+        .firebase-badge {
+            display: inline-block; background: #FF6D00; color: white;
+            font-size: 11px; padding: 2px 8px; border-radius: 20px; margin-left: 8px;
+        }
+        .loading-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(255,255,255,0.8); display: flex; align-items: center;
+            justify-content: center; z-index: 9998; font-size: 18px; font-weight: bold;
+            color: var(--dark-blue); display: none;
+        }
+        @media (max-width: 480px) {
+            .login-box { padding: 20px; }
+            .header { flex-direction: column; text-align: center; }
+            .subject-card { flex-direction: column; align-items: flex-start; }
+            .btn-small { padding: 6px 10px; font-size: 11px; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- Firebase Status Banner -->
+<div id="fbStatusBanner">🔥 Menghubungkan ke Firebase...</div>
+
+<!-- Loading Overlay -->
+<div class="loading-overlay" id="loadingOverlay">⏳ Menyimpan data...</div>
+
+<!-- SPLASH -->
+<div id="splashScreen" class="splash-screen">
+    <div class="top-banner">Web builder @Raditya pradana &nbsp;|&nbsp; ウェブビルダー @Raditya pradana</div>
+    <div class="splash-container">
+        <h1>Welcome to the daily exam XI TJKT 2</h1>
+        <p>Computer based examination system with anti-cheat audio</p>
+        <p style="margin-top:8px; font-size:13px; opacity:0.8">🔥 Powered by Firebase - Data tersync ke semua HP!</p>
+        <div class="progress-container"><div class="progress-bar"></div></div>
+        <div class="loading-text">Memuat sistem ujian...</div>
+    </div>
+    <div class="splash-footer">
+        Ujian kelas XI TJKT 2 © 2026<br>
+        Developed by <strong>Raditya XI TJKT2</strong>
+    </div>
+</div>
+
+<!-- CBT APP -->
+<div id="cbtApp" class="cbt-app">
+
+    <!-- LOGIN -->
+    <div id="loginScreen" class="center-screen">
+        <div class="login-box">
+            <h2>📚 CBT Ujian Online <span class="firebase-badge">🔥 Firebase</span></h2>
+            <select id="roleSelect" class="input">
+                <option value="murid">👨‍🎓 Login Sebagai Murid</option>
+                <option value="guru">👨‍🏫 Login Sebagai Guru</option>
+            </select>
+            <input id="loginUser" class="input" placeholder="Username" autocomplete="off">
+            <input id="loginPass" class="input" type="password" placeholder="Password">
+            <button class="btn" onclick="performLogin()">MASUK</button>
+            <div class="login-options">
+                <button class="btn btn-scan-qr" onclick="openQRScanner()">📷 Scan QR Login</button>
+            </div>
+            <div class="small" style="margin-top:10px">
+                <strong>🔐 Petunjuk Login:</strong><br>
+                Guru: username <code>guru</code> | password <code>admin</code><br>
+                Siswa: sesuai yang ditambahkan guru
+            </div>
+            <div class="small" style="margin-top:8px; color: #10b981;">
+                🔥 Data otomatis sync ke semua HP via Firebase!
+            </div>
+        </div>
+    </div>
+
+    <!-- APP UTAMA -->
+    <div id="app" class="app">
+        <div class="container">
+
+            <!-- HEADER -->
+            <div class="header">
+                <div><strong>📖 Ujian Harian XI TJKT 2</strong> <span class="firebase-badge">🔥 Live</span></div>
+                <div>
+                    <span>👤 <b id="whoLabel">-</b></span>
+                    <button class="btn-small btn-danger" onclick="logout()">🚪 Logout</button>
+                </div>
+            </div>
+
+            <!-- DASHBOARD SISWA -->
+            <div id="studentDashboard" style="display:none;">
+                <div class="card">
+                    <h3>📚 Pilih Mata Pelajaran</h3>
+                    <div id="subjectsStudentList"></div>
+                </div>
+                <div id="studentScoreBox" class="card" style="display:none;">
+                    <h4>📊 Hasil Ujian</h4>
+                    <div id="studentResultInfo"></div>
+                </div>
+            </div>
+
+            <!-- DASHBOARD GURU -->
+            <div id="teacherDashboard" style="display:none;">
+                <div class="sync-card">
+                    <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px">
+                        <span style="font-size:24px">🔥</span>
+                        <strong>DATA TERSIMPAN DI FIREBASE - SYNC KE SEMUA HP!</strong>
+                    </div>
+                    <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:10px">
+                        <button class="btn-small" style="background:white; color:#764ba2; font-weight:bold" onclick="generateShareQR()">📱 QR Code Link</button>
+                        <button class="btn-small" style="background:white; color:#764ba2; font-weight:bold" onclick="copyShareLink()">🔗 Copy Link Web</button>
+                        <button class="btn-small" style="background:white; color:#764ba2; font-weight:bold" onclick="shareViaWA()">💬 Share ke WhatsApp</button>
+                        <button class="btn-small" style="background:#4CAF50; color:white; font-weight:bold" onclick="openQRLoginMenu()">🎟️ QR Login Siswa</button>
+                    </div>
+                    <div class="small" style="opacity:0.9">
+                        💡 Siswa cukup buka link web ini dari HP masing-masing. Soal & data otomatis tersync!
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:16px">
+                        <button class="btn-add btn-small" onclick="openAddSubjectModal()">➕ Tambah Mapel</button>
+                        <button class="btn-small btn-add" onclick="openAddStudentModal()">👥 Tambah Siswa</button>
+                        <button class="btn-small btn-export" onclick="exportAllCSV()">📥 Export CSV</button>
+                        <button class="btn-small btn-export" onclick="exportDatabase()">💾 Backup DB</button>
+                        <button class="btn-small btn-import" onclick="openImportModal()">📁 Import DB</button>
+                        <button class="btn-small btn-refresh" onclick="loadAllData()">🔄 Refresh Firebase</button>
+                    </div>
+
+                    <h3>📖 Daftar Mata Pelajaran (<span id="subjectCount">0</span>)</h3>
+                    <div id="subjectsTeacherList"></div>
+                    <hr>
+                    <h3>👨‍🎓 Daftar Siswa (<span id="studentCount">0</span>)</h3>
+                    <div style="overflow-x:auto">
+                        <table class="table">
+                            <thead><tr><th>Nama</th><th>Username</th><th>Aksi</th></tr></thead>
+                            <tbody id="studentsTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- HASIL UJIAN SEMUA SISWA -->
+                <div class="card">
+                    <h3>📊 Rekap Hasil Ujian</h3>
+                    <button class="btn-small btn-refresh" onclick="loadExamResults()">🔄 Refresh</button>
+                    <div style="overflow-x:auto; margin-top:10px">
+                        <table class="table">
+                            <thead><tr><th>Nama</th><th>Mapel</th><th>Nilai</th><th>%</th><th>Tanggal</th></tr></thead>
+                            <tbody id="examResultsTable"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- HALAMAN UJIAN -->
+            <div id="examPage" style="display:none;">
+                <div class="card">
+                    <div style="display:flex; justify-content:space-between; flex-wrap:wrap">
+                        <div>
+                            <h3 id="examSubjectTitle">Ujian</h3>
+                            <div class="small">Total: <span id="qTotal">0</span> soal</div>
+                        </div>
+                        <div class="small">⏱️ Sisa Waktu: <span id="timerDisplay" style="font-weight:bold; font-size:18px">00:00</span></div>
+                    </div>
+                    <div class="small" style="background:#fef3c7; padding:8px; border-radius:8px; margin-bottom:10px">
+                        🔒 <strong>PERINGATAN:</strong> Jangan keluar dari halaman ini! Jika ketahuan, akan ada SUARA MEMALUKAN!
+                    </div>
+                    <div style="background:#1e293b; padding:10px; border-radius:10px; margin-bottom:15px; text-align:center;">
+                        <div id="cameraStatus" style="color:white; font-size:12px; margin-bottom:5px;">📷 Kamera akan aktif setelah izin</div>
+                        <video id="video" autoplay playsinline style="width:100%; max-width:300px; border-radius:10px; background:#000; display:none;"></video>
+                        <button id="startCameraBtn" class="btn-small" style="background:#4CAF50; color:white; margin-top:5px;" onclick="requestCameraPermission()">📷 Izinkan Kamera</button>
+                        <div class="small" style="color:white;">📹 Kamera akan difoto setiap 30 detik</div>
+                    </div>
+                    <form id="examForm" onsubmit="return false;">
+                        <div id="questionsContainer"></div>
+                        <div style="display:flex; gap:10px; margin-top:20px; flex-wrap:wrap">
+                            <button class="btn" onclick="submitExam()">✅ Kirim & Selesai</button>
+                            <button class="btn" style="background:#f59e0b" onclick="saveProgress()">💾 Simpan Progress</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- HALAMAN HASIL -->
+            <div id="resultPage" style="display:none;">
+                <div class="card">
+                    <h3>📄 Hasil Ujian</h3>
+                    <div id="resultDetail"></div>
+                    <button class="btn" onclick="backToDashboard()">◀ Kembali ke Dashboard</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODALS -->
+
+<!-- Modal QR Code -->
+<div id="qrModal" class="modal">
+    <div class="modal-content">
+        <h3>📱 QR Code</h3>
+        <div class="qr-container">
+            <div id="qrcode" class="qr-code"></div>
+            <div class="share-link" id="shareLinkDisplay"></div>
+        </div>
+        <div style="margin-top:16px; display:flex; gap:10px; flex-wrap:wrap">
+            <button class="btn" style="background:#25D366; color:white" onclick="shareViaWA()">📱 Share ke WhatsApp</button>
+            <button class="btn" style="background:#aaa" onclick="closeQRModal()">Tutup</button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal QR Scanner Login -->
+<div id="qrScannerModal" class="modal">
+    <div class="modal-content" style="max-width:500px;">
+        <h3>📷 Scan QR Code Login</h3>
+        <p class="small">Arahkan kamera ke QR code dari guru</p>
+        <div id="qr-reader" style="width:100%;"></div>
+        <button class="btn" style="margin-top:10px; background:#aaa;" onclick="closeQRScannerModal()">Tutup</button>
+    </div>
+</div>
+
+<!-- Modal QR Login Menu -->
+<div id="qrLoginMenuModal" class="modal">
+    <div class="modal-content">
+        <h3>🎟️ Pilih Siswa untuk QR Login</h3>
+        <div id="qrStudentList"></div>
+        <button class="btn" style="background:#aaa" onclick="closeModal('qrLoginMenuModal')">Batal</button>
+    </div>
+</div>
+
+<!-- Modal Tambah Mapel -->
+<div id="addSubjectModal" class="modal">
+    <div class="modal-content">
+        <h3>➕ Tambah Mata Pelajaran</h3>
+        <input id="newSubjectName" class="input" placeholder="Nama Mata Pelajaran">
+        <textarea id="newSubjectQuestions" class="input" rows="8" placeholder='Soal ujian dalam format JSON:&#10;&#10;[&#10;  {&#10;    "question": "Apa ibu kota Indonesia?",&#10;    "options": ["Jakarta", "Surabaya", "Bandung", "Medan"],&#10;    "answer": 0,&#10;    "type": "pilihan"&#10;  },&#10;  {&#10;    "question": "Jelaskan pengertian HTML!",&#10;    "type": "essay"&#10;  }&#10;]'></textarea>
+        <div style="display:flex; gap:10px; margin-top:10px">
+            <button class="btn" onclick="addSubject()">Simpan ke Firebase</button>
+            <button class="btn" style="background:#aaa" onclick="closeModal('addSubjectModal')">Batal</button>
+        </div>
+        <div class="small" style="margin-top:10px">
+            💡 Format JSON: untuk pilihan ganda wajib ada "options" dan "answer" (index mulai 0), untuk essay cukup "question" dan "type":"essay"
+        </div>
+    </div>
+</div>
+
+<!-- Modal Tambah Siswa -->
+<div id="addStudentModal" class="modal">
+    <div class="modal-content">
+        <h3>👥 Tambah Siswa</h3>
+        <input id="studentName" class="input" placeholder="Nama Lengkap">
+        <input id="studentUsername" class="input" placeholder="Username">
+        <input id="studentPassword" class="input" type="password" placeholder="Password">
+        <div style="display:flex; gap:10px; margin-top:10px">
+            <button class="btn" onclick="addStudent()">Simpan ke Firebase</button>
+            <button class="btn" style="background:#aaa" onclick="closeModal('addStudentModal')">Batal</button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Import Database -->
+<div id="importModal" class="modal">
+    <div class="modal-content">
+        <h3>📁 Import Database ke Firebase</h3>
+        <p class="small">Pilih file JSON hasil backup sebelumnya. Data akan diupload ke Firebase.</p>
+        <input type="file" id="importFile" accept=".json" class="input">
+        <div style="display:flex; gap:10px; margin-top:10px">
+            <button class="btn" onclick="importDatabase()">Import ke Firebase</button>
+            <button class="btn" style="background:#aaa" onclick="closeModal('importModal')">Batal</button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Foto Kamera -->
+<div id="cameraModal" class="modal">
+    <div class="modal-content">
+        <h3>📸 Foto Siswa</h3>
+        <img id="modalCameraImg" style="width:100%; border-radius:10px;">
+        <button class="btn" style="margin-top:10px;" onclick="closeCameraModal()">Tutup</button>
+    </div>
+</div>
+
+<!-- FIREBASE SDK -->
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+    import {
+        getFirestore, collection, doc, setDoc, getDoc, getDocs,
+        deleteDoc, onSnapshot, query, orderBy
+    } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyAtqu3aPw-_hLxG9iovQ3CtmBe4r9vQh-M",
+        authDomain: "ujian-xitjkt2.firebaseapp.com",
+        projectId: "ujian-xitjkt2",
+        storageBucket: "ujian-xitjkt2.firebasestorage.app",
+        messagingSenderId: "498289702775",
+        appId: "1:498289702775:web:37b96d90dfe6a3ab9d9372",
+        measurementId: "G-GP56HX26JH"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    // ==========================================
+    // FIREBASE HELPER FUNCTIONS
+    // ==========================================
+
+    async function fbSetSubject(subject) {
+        await setDoc(doc(db, "subjects", String(subject.id)), subject);
+    }
+
+    async function fbDeleteSubject(id) {
+        await deleteDoc(doc(db, "subjects", String(id)));
+    }
+
+    async function fbGetSubjects() {
+        const snap = await getDocs(collection(db, "subjects"));
+        const arr = [];
+        snap.forEach(d => arr.push(d.data()));
+        arr.sort((a, b) => a.id - b.id);
+        return arr;
+    }
+
+    async function fbSetStudent(student) {
+        await setDoc(doc(db, "students", student.username), student);
+    }
+
+    async function fbDeleteStudent(username) {
+        await deleteDoc(doc(db, "students", username));
+    }
+
+    async function fbGetStudents() {
+        const snap = await getDocs(collection(db, "students"));
+        const arr = [];
+        snap.forEach(d => arr.push(d.data()));
+        return arr;
+    }
+
+    async function fbSetExamResult(result) {
+        const key = result.username + "_" + result.subjectId;
+        await setDoc(doc(db, "examResults", key), result);
+    }
+
+    async function fbGetExamResults() {
+        const snap = await getDocs(collection(db, "examResults"));
+        const arr = [];
+        snap.forEach(d => arr.push(d.data()));
+        return arr;
+    }
+
+    async function fbGetExamResultsForUser(username) {
+        const all = await fbGetExamResults();
+        return all.filter(r => r.username === username);
+    }
+
+    async function fbSetProgress(username, subjectId, answers) {
+        await setDoc(doc(db, "progress", username + "_" + subjectId), { username, subjectId, answers });
+    }
+
+    async function fbGetProgress(username, subjectId) {
+        const d = await getDoc(doc(db, "progress", username + "_" + subjectId));
+        return d.exists() ? d.data().answers : null;
+    }
+
+    async function fbDeleteProgress(username, subjectId) {
+        await deleteDoc(doc(db, "progress", username + "_" + subjectId));
+    }
+
+    // Expose to global
+    window._fb = {
+        fbSetSubject, fbDeleteSubject, fbGetSubjects,
+        fbSetStudent, fbDeleteStudent, fbGetStudents,
+        fbSetExamResult, fbGetExamResults, fbGetExamResultsForUser,
+        fbSetProgress, fbGetProgress, fbDeleteProgress
+    };
+
+    window.dispatchEvent(new Event('firebaseReady'));
+</script>
+
+<script>
+    // ==========================================
+    // STATE
+    // ==========================================
+    let subjects = [];
+    let students = [];
+    let examResults = [];
+    let currentUser = null;
+    let currentSubject = null;
+    let currentAnswers = {};
+    let examTimer = null;
+    let cheatWarningCount = 0;
+    let cameraStream = null;
+    let cameraInterval = null;
+    let videoElement = null;
+    let isCameraReady = false;
+    let html5QrCode = null;
+    let fbReady = false;
+
+    // ==========================================
+    // FIREBASE READY
+    // ==========================================
+    window.addEventListener('firebaseReady', async () => {
+        fbReady = true;
+        setFbStatus('connected', '🔥 Firebase terhubung!');
+        setTimeout(() => document.getElementById('fbStatusBanner').style.display = 'none', 2000);
+    });
+
+    function setFbStatus(type, msg) {
+        const el = document.getElementById('fbStatusBanner');
+        el.className = type;
+        el.textContent = msg;
+        el.style.display = 'block';
+    }
+
+    function showLoading(show) {
+        document.getElementById('loadingOverlay').style.display = show ? 'flex' : 'none';
+    }
+
+    async function loadAllData() {
+        if (!fbReady) { alert("Firebase belum siap, coba lagi sebentar!"); return; }
+        showLoading(true);
+        try {
+            subjects = await window._fb.fbGetSubjects();
+            students = await window._fb.fbGetStudents();
+            examResults = await window._fb.fbGetExamResults();
+            if (currentUser?.role === 'guru') renderTeacherDashboard();
+            else if (currentUser?.role === 'murid') renderStudentDashboard();
+        } catch(e) {
+            alert("Gagal load data dari Firebase: " + e.message);
+        }
+        showLoading(false);
+    }
+
+    async function loadExamResults() {
+        if (!fbReady) return;
+        examResults = await window._fb.fbGetExamResults();
+        renderExamResultsTable();
+    }
+
+    // ==========================================
+    // SPLASH - langsung tampil login setelah 2 detik
+    // Firebase connect di background
+    // ==========================================
+    setTimeout(() => {
+        document.getElementById('splashScreen').classList.add('hide');
+        document.getElementById('cbtApp').style.display = 'block';
+    }, 2000);
+
+    // Timeout fallback: kalau Firebase 10 detik belum ready, kasih info
+    setTimeout(() => {
+        if (!fbReady) {
+            setFbStatus('error', '⚠️ Firebase lambat terhubung. Cek koneksi internet, lalu refresh halaman.');
+        }
+    }, 10000);
+
+    // ==========================================
+    // LOGIN
+    // ==========================================
+    async function waitForFirebase(maxSeconds = 15) {
+        if (fbReady) return true;
+        return new Promise((resolve) => {
+            const start = Date.now();
+            const check = setInterval(() => {
+                if (fbReady) { clearInterval(check); resolve(true); }
+                else if (Date.now() - start > maxSeconds * 1000) { clearInterval(check); resolve(false); }
+            }, 300);
+        });
+    }
+
+    async function performLogin() {
+        if (!fbReady) {
+            setFbStatus('connecting', '🔥 Menghubungkan ke Firebase, harap tunggu...');
+            const ok = await waitForFirebase(15);
+            if (!ok) { alert("❌ Gagal terhubung ke Firebase!\nPastikan koneksi internet aktif, lalu refresh halaman."); return; }
+        }
+        const role = document.getElementById('roleSelect').value;
+        const username = document.getElementById('loginUser').value.trim();
+        const password = document.getElementById('loginPass').value;
+
+        if (!username || !password) { alert("Username dan password wajib diisi!"); return; }
+
+        if (role === 'guru') {
+            if (username === 'guru' && password === 'admin') {
+                currentUser = { username, role: 'guru', name: 'Guru' };
+                showLoading(true);
+                await loadAllData();
+                showLoading(false);
+                document.getElementById('loginScreen').style.display = 'none';
+                document.getElementById('app').style.display = 'block';
+                document.getElementById('whoLabel').innerHTML = '👨‍🏫 Guru';
+                renderTeacherDashboard();
+            } else {
+                alert("❌ Login guru gagal!\nUsername: guru | Password: admin");
+            }
+        } else {
+            showLoading(true);
+            students = await window._fb.fbGetStudents();
+            showLoading(false);
+            const student = students.find(s => s.username === username && s.password === password);
+            if (student) {
+                currentUser = { username: student.username, name: student.name, role: 'murid' };
+                showLoading(true);
+                subjects = await window._fb.fbGetSubjects();
+                examResults = await window._fb.fbGetExamResultsForUser(username);
+                showLoading(false);
+                document.getElementById('loginScreen').style.display = 'none';
+                document.getElementById('app').style.display = 'block';
+                document.getElementById('whoLabel').innerHTML = `👨‍🎓 ${student.name}`;
+                renderStudentDashboard();
+            } else {
+                alert("❌ Siswa tidak ditemukan! Pastikan username dan password benar.");
+            }
+        }
+    }
+
+    async function performLoginViaQR(username, password) {
+        if (!fbReady) { alert("Firebase belum siap!"); return false; }
+        showLoading(true);
+        students = await window._fb.fbGetStudents();
+        showLoading(false);
+        const student = students.find(s => s.username === username && s.password === password);
+        if (student) {
+            currentUser = { username: student.username, name: student.name, role: 'murid' };
+            showLoading(true);
+            subjects = await window._fb.fbGetSubjects();
+            examResults = await window._fb.fbGetExamResultsForUser(username);
+            showLoading(false);
+            document.getElementById('loginScreen').style.display = 'none';
+            document.getElementById('app').style.display = 'block';
+            document.getElementById('whoLabel').innerHTML = `👨‍🎓 ${student.name}`;
+            renderStudentDashboard();
+            return true;
+        } else {
+            alert("❌ QR Code tidak valid!");
+            return false;
+        }
+    }
+
+    function logout() {
+        if (examTimer) { clearInterval(examTimer); examTimer = null; }
+        currentUser = null; currentSubject = null; currentAnswers = {};
+        cheatWarningCount = 0; stopCamera();
+        document.getElementById('app').style.display = 'none';
+        document.getElementById('loginScreen').style.display = 'flex';
+        document.getElementById('loginUser').value = '';
+        document.getElementById('loginPass').value = '';
+        document.getElementById('roleSelect').value = 'murid';
+    }
+
+    // ==========================================
+    // DASHBOARD SISWA
+    // ==========================================
+    function renderStudentDashboard() {
+        document.getElementById('studentDashboard').style.display = 'block';
+        document.getElementById('teacherDashboard').style.display = 'none';
+        document.getElementById('examPage').style.display = 'none';
+        document.getElementById('resultPage').style.display = 'none';
+        cheatWarningCount = 0;
+
+        let html = '';
+        if (subjects.length === 0) {
+            html = '<p class="small">Belum ada mata pelajaran. Hubungi guru.</p>';
+        }
+        subjects.forEach(sub => {
+            const hasDone = examResults.some(r => r.username === currentUser.username && r.subjectId === sub.id);
+            html += `<div class="subject-card">
+                        <div>
+                            <b>📘 ${sub.name}</b>
+                            ${hasDone ? '<span class="badge badge-success">✅ Sudah dikerjakan</span>' : '<span class="badge badge-warning">⏳ Belum dikerjakan</span>'}
+                        </div>
+                        <button class="btn-small btn-add" onclick="startExam(${sub.id})" ${hasDone ? 'disabled' : ''}>
+                            ${hasDone ? 'Sudah Selesai' : '🚀 Mulai Ujian'}
+                        </button>
+                     </div>`;
+        });
+        document.getElementById('subjectsStudentList').innerHTML = html;
+
+        const studentResults = examResults.filter(r => r.username === currentUser.username);
+        if (studentResults.length > 0) {
+            document.getElementById('studentScoreBox').style.display = 'block';
+            let resultHtml = '<div style="margin-top:10px">';
+            studentResults.forEach(r => {
+                const sub = subjects.find(s => s.id === r.subjectId);
+                const persen = r.total > 0 ? Math.round((r.score / r.total) * 100) : 0;
+                resultHtml += `<div style="margin-bottom:8px">
+                                <b>${sub?.name || r.subjectName}</b>: 
+                                Nilai ${r.score}/${r.total} (${persen}%)
+                                <div class="small">📅 ${new Date(r.date).toLocaleDateString('id-ID')}</div>
+                               </div>`;
+            });
+            resultHtml += '</div>';
+            document.getElementById('studentResultInfo').innerHTML = resultHtml;
+        } else {
+            document.getElementById('studentScoreBox').style.display = 'none';
+        }
+    }
+
+    // ==========================================
+    // UJIAN
+    // ==========================================
+    async function startExam(subjectId) {
+        const subject = subjects.find(s => s.id === subjectId);
+        if (!subject) { alert("Mata pelajaran tidak ditemukan!"); return; }
+        const hasDone = examResults.some(r => r.username === currentUser.username && r.subjectId === subjectId);
+        if (hasDone) { alert("Anda sudah mengerjakan ujian ini!"); return; }
+
+        currentSubject = subject;
+        showLoading(true);
+        const savedProgress = await window._fb.fbGetProgress(currentUser.username, subjectId);
+        showLoading(false);
+        currentAnswers = savedProgress || {};
+
+        document.getElementById('studentDashboard').style.display = 'none';
+        document.getElementById('examPage').style.display = 'block';
+        document.getElementById('examSubjectTitle').innerHTML = subject.name;
+        renderQuestions();
+        startTimer(30);
+        startCameraCapture();
+    }
+
+    function renderQuestions() {
+        const subject = currentSubject;
+        if (!subject || !subject.questions || subject.questions.length === 0) {
+            document.getElementById('questionsContainer').innerHTML = '<div class="soal"><p>⚠️ Belum ada soal untuk mata pelajaran ini.</p></div>';
+            document.getElementById('qTotal').innerText = '0';
+            return;
+        }
+        document.getElementById('qTotal').innerText = subject.questions.length;
+        let html = '';
+        subject.questions.forEach((q, idx) => {
+            html += `<div class="soal" data-index="${idx}"><strong>${idx+1}. ${escapeHtml(q.question)}</strong><br>`;
+            if (q.type === 'essay') {
+                html += `<div class="essay"><textarea class="essay-text" data-idx="${idx}" placeholder="Tulis jawaban essay di sini..." rows="4">${escapeHtml(currentAnswers[idx] || '')}</textarea></div>`;
+            } else {
+                if (q.options && q.options.length > 0) {
+                    html += `<div class="options">`;
+                    q.options.forEach((opt, optIdx) => {
+                        const isChecked = currentAnswers[idx] == optIdx;
+                        html += `<label><input type="radio" name="q${idx}" value="${optIdx}" ${isChecked ? 'checked' : ''}>${escapeHtml(opt)}</label>`;
+                    });
+                    html += `</div>`;
+                } else {
+                    html += `<div class="small" style="color:red;">⚠️ Opsi jawaban tidak tersedia</div>`;
+                }
+            }
+            html += `</div>`;
+        });
+        document.getElementById('questionsContainer').innerHTML = html;
+
+        document.querySelectorAll('.essay-text').forEach(textarea => {
+            textarea.addEventListener('input', (e) => {
+                currentAnswers[parseInt(e.target.dataset.idx)] = e.target.value;
+                saveProgress();
+            });
+        });
+        document.querySelectorAll('input[type="radio"]').forEach(radio => {
+            radio.addEventListener('change', (e) => {
+                const idx = parseInt(e.target.name.substring(1));
+                currentAnswers[idx] = parseInt(e.target.value);
+                saveProgress();
+            });
+        });
+    }
+
+    function startTimer(minutes) {
+        if (examTimer) clearInterval(examTimer);
+        let timeLeft = minutes * 60;
+        const timerDisplay = document.getElementById('timerDisplay');
+        examTimer = setInterval(() => {
+            if (timeLeft <= 0) {
+                clearInterval(examTimer); examTimer = null;
+                alert("⏰ WAKTU HABIS! Ujian akan dikirim otomatis.");
+                submitExam(); return;
+            }
+            const mins = Math.floor(timeLeft / 60);
+            const secs = timeLeft % 60;
+            timerDisplay.innerText = `${mins.toString().padStart(2,'0')}:${secs.toString().padStart(2,'0')}`;
+            if (timeLeft === 300) playShameSound("Perhatian! Waktu ujian tersisa 5 menit lagi. Selesaikan segera!");
+            if (timeLeft === 60) playShameSound("Perhatian! Waktu ujian tersisa 1 menit lagi!");
+            timeLeft--;
+        }, 1000);
+    }
+
+    async function saveProgress() {
+        if (currentSubject && currentUser && fbReady) {
+            try {
+                await window._fb.fbSetProgress(currentUser.username, currentSubject.id, currentAnswers);
+            } catch(e) {
+                console.log("Save progress error:", e);
+            }
+        }
+    }
+
+    async function submitExam() {
+        if (!currentSubject || !currentUser) { alert("Tidak ada ujian yang sedang berlangsung"); return; }
+        if (examTimer) { clearInterval(examTimer); examTimer = null; }
+        stopCamera();
+
+        let score = 0;
+        let totalPilihan = 0;
+        currentSubject.questions.forEach((q, idx) => {
+            if (q.type !== 'essay') {
+                totalPilihan++;
+                if (currentAnswers[idx] !== undefined && parseInt(currentAnswers[idx]) === q.answer) score++;
+            }
+        });
+
+        const result = {
+            username: currentUser.username,
+            name: currentUser.name,
+            subjectId: currentSubject.id,
+            subjectName: currentSubject.name,
+            score, total: totalPilihan,
+            answers: currentAnswers,
+            date: new Date().toISOString()
+        };
+
+        showLoading(true);
+        try {
+            await window._fb.fbSetExamResult(result);
+            await window._fb.fbDeleteProgress(currentUser.username, currentSubject.id);
+            examResults = examResults.filter(r => !(r.username === currentUser.username && r.subjectId === currentSubject.id));
+            examResults.push(result);
+        } catch(e) {
+            alert("Gagal simpan hasil ke Firebase: " + e.message);
+        }
+        showLoading(false);
+
+        const persen = totalPilihan > 0 ? Math.round((score / totalPilihan) * 100) : 0;
+        let grade = '';
+        if (persen >= 90) grade = 'A (Sangat Baik)';
+        else if (persen >= 80) grade = 'B (Baik)';
+        else if (persen >= 70) grade = 'C (Cukup)';
+        else if (persen >= 60) grade = 'D (Kurang)';
+        else grade = 'E (Harus Remedial)';
+
+        alert(`✅ Ujian selesai!\nNilai Anda: ${score}/${totalPilihan} (${persen}%)\nPredikat: ${grade}\n\n🔥 Nilai tersimpan di Firebase!`);
+        backToDashboard();
+    }
+
+    function backToDashboard() {
+        stopCamera();
+        if (currentUser.role === 'murid') renderStudentDashboard();
+        else renderTeacherDashboard();
+    }
+
+    // ==========================================
+    // DASHBOARD GURU
+    // ==========================================
+    function renderTeacherDashboard() {
+        document.getElementById('teacherDashboard').style.display = 'block';
+        document.getElementById('studentDashboard').style.display = 'none';
+        document.getElementById('examPage').style.display = 'none';
+        document.getElementById('resultPage').style.display = 'none';
+
+        document.getElementById('subjectCount').innerText = subjects.length;
+        let subHtml = '';
+        subjects.forEach(sub => {
+            subHtml += `<div class="subject-card">
+                        <div><b>📚 ${escapeHtml(sub.name)}</b> <span class="small">(${sub.questions.length} soal)</span></div>
+                        <div>
+                            <button class="btn-small btn-add" onclick="editSubject(${sub.id})">✏️ Edit</button>
+                            <button class="btn-small btn-delete" onclick="deleteSubject(${sub.id})">🗑️ Hapus</button>
+                        </div>
+                       </div>`;
+        });
+        document.getElementById('subjectsTeacherList').innerHTML = subHtml || '<p class="small">Belum ada mata pelajaran.</p>';
+
+        document.getElementById('studentCount').innerText = students.length;
+        let studentHtml = '';
+        students.forEach(s => {
+            studentHtml += `<tr>
+                            <td>${escapeHtml(s.name)}</td>
+                            <td>${escapeHtml(s.username)}</td>
+                            <td>
+                                <button class="btn-small btn-add" onclick="generateSingleLoginQR('${s.username}', '${s.password}')">🎟️ QR Login</button>
+                                <button class="btn-small btn-delete" onclick="deleteStudent('${s.username}')">Hapus</button>
+                            </td>
+                           </tr>`;
+        });
+        document.getElementById('studentsTableBody').innerHTML = studentHtml;
+        renderExamResultsTable();
+    }
+
+    function renderExamResultsTable() {
+        let html = '';
+        if (examResults.length === 0) {
+            html = '<tr><td colspan="5" class="small">Belum ada hasil ujian.</td></tr>';
+        }
+        examResults.sort((a,b) => new Date(b.date) - new Date(a.date)).forEach(r => {
+            const persen = r.total > 0 ? Math.round((r.score / r.total) * 100) : 0;
+            html += `<tr>
+                        <td>${escapeHtml(r.name)}</td>
+                        <td>${escapeHtml(r.subjectName)}</td>
+                        <td>${r.score}/${r.total}</td>
+                        <td>${persen}%</td>
+                        <td>${new Date(r.date).toLocaleDateString('id-ID')}</td>
+                     </tr>`;
+        });
+        document.getElementById('examResultsTable').innerHTML = html;
+    }
+
+    // ==========================================
+    // CRUD MAPEL
+    // ==========================================
+    async function addSubject() {
+        const name = document.getElementById('newSubjectName').value.trim();
+        const questionsText = document.getElementById('newSubjectQuestions').value.trim();
+        if (!name) { alert("Nama mata pelajaran wajib diisi!"); return; }
+        let qList = [];
+        if (questionsText) {
+            try {
+                qList = JSON.parse(questionsText);
+                if (!Array.isArray(qList)) throw new Error("Harus array");
+            } catch(e) {
+                alert("Format JSON soal salah!\n" + e.message); return;
+            }
+        }
+        const newId = subjects.length > 0 ? Math.max(...subjects.map(s => s.id)) + 1 : 1;
+        const newSubject = { id: newId, name, questions: qList };
+        showLoading(true);
+        try {
+            await window._fb.fbSetSubject(newSubject);
+            subjects.push(newSubject);
+            renderTeacherDashboard();
+            closeModal('addSubjectModal');
+            document.getElementById('newSubjectName').value = '';
+            document.getElementById('newSubjectQuestions').value = '';
+            alert("✅ Mata pelajaran berhasil ditambahkan ke Firebase!");
+        } catch(e) {
+            alert("Gagal simpan ke Firebase: " + e.message);
+        }
+        showLoading(false);
+    }
+
+    async function deleteSubject(id) {
+        if (confirm("⚠️ Yakin ingin menghapus mata pelajaran ini?")) {
+            showLoading(true);
+            try {
+                await window._fb.fbDeleteSubject(id);
+                subjects = subjects.filter(s => s.id !== id);
+                renderTeacherDashboard();
+                alert("Mata pelajaran berhasil dihapus dari Firebase!");
+            } catch(e) {
+                alert("Gagal hapus dari Firebase: " + e.message);
+            }
+            showLoading(false);
+        }
+    }
+
+    async function editSubject(id) {
+        const sub = subjects.find(s => s.id === id);
+        if (!sub) return;
+        const newName = prompt("Edit nama mata pelajaran:", sub.name);
+        if (newName && newName.trim()) sub.name = newName.trim();
+        const newQuestions = prompt("Edit soal (format JSON):", JSON.stringify(sub.questions, null, 2));
+        if (newQuestions) {
+            try { sub.questions = JSON.parse(newQuestions); }
+            catch(e) { alert("Format JSON salah! Soal tidak diubah."); return; }
+        }
+        showLoading(true);
+        try {
+            await window._fb.fbSetSubject(sub);
+            renderTeacherDashboard();
+            alert("✅ Mata pelajaran berhasil diupdate di Firebase!");
+        } catch(e) {
+            alert("Gagal update ke Firebase: " + e.message);
+        }
+        showLoading(false);
+    }
+
+    // ==========================================
+    // CRUD SISWA
+    // ==========================================
+    async function addStudent() {
+        const name = document.getElementById('studentName').value.trim();
+        const username = document.getElementById('studentUsername').value.trim();
+        const password = document.getElementById('studentPassword').value.trim();
+        if (!name || !username || !password) { alert("Semua field wajib diisi!"); return; }
+        if (students.find(s => s.username === username)) { alert("Username sudah terdaftar!"); return; }
+        const newStudent = { name, username, password };
+        showLoading(true);
+        try {
+            await window._fb.fbSetStudent(newStudent);
+            students.push(newStudent);
+            renderTeacherDashboard();
+            closeModal('addStudentModal');
+            document.getElementById('studentName').value = '';
+            document.getElementById('studentUsername').value = '';
+            document.getElementById('studentPassword').value = '';
+            alert(`✅ Siswa ${name} berhasil ditambahkan ke Firebase!`);
+        } catch(e) {
+            alert("Gagal simpan ke Firebase: " + e.message);
+        }
+        showLoading(false);
+    }
+
+    async function deleteStudent(username) {
+        if (confirm(`Hapus siswa "${username}"?`)) {
+            showLoading(true);
+            try {
+                await window._fb.fbDeleteStudent(username);
+                students = students.filter(s => s.username !== username);
+                renderTeacherDashboard();
+                alert("Siswa berhasil dihapus dari Firebase!");
+            } catch(e) {
+                alert("Gagal hapus dari Firebase: " + e.message);
+            }
+            showLoading(false);
+        }
+    }
+
+    // ==========================================
+    // EXPORT / IMPORT
+    // ==========================================
+    function exportAllCSV() {
+        let csv = "\uFEFFUsername,Nama,Mapel,Nilai,Total,Persen,Tanggal\n";
+        examResults.forEach(r => {
+            const persen = r.total > 0 ? Math.round((r.score / r.total) * 100) : 0;
+            csv += `"${r.username}","${r.name}","${r.subjectName}",${r.score},${r.total},${persen}%,"${r.date}"\n`;
+        });
+        const blob = new Blob([csv], {type: 'text/csv;charset=utf-8;'});
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.setAttribute('download', 'hasil_ujian.csv');
+        document.body.appendChild(link); link.click(); document.body.removeChild(link);
+    }
+
+    function exportDatabase() {
+        const data = { subjects, students, examResults, exportDate: new Date().toISOString() };
+        const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.setAttribute('download', `cbt_backup_${new Date().toISOString().slice(0,10)}.json`);
+        document.body.appendChild(link); link.click(); document.body.removeChild(link);
+        alert("Database berhasil dibackup!");
+    }
+
+    async function importDatabase() {
+        const file = document.getElementById('importFile').files[0];
+        if (!file) { alert("Pilih file JSON terlebih dahulu!"); return; }
+        const reader = new FileReader();
+        reader.onload = async function(e) {
+            try {
+                const data = JSON.parse(e.target.result);
+                showLoading(true);
+                if (data.subjects) {
+                    for (const sub of data.subjects) await window._fb.fbSetSubject(sub);
+                    subjects = data.subjects;
+                }
+                if (data.students) {
+                    for (const stu of data.students) await window._fb.fbSetStudent(stu);
+                    students = data.students;
+                }
+                if (data.examResults) {
+                    for (const res of data.examResults) await window._fb.fbSetExamResult(res);
+                    examResults = data.examResults;
+                }
+                showLoading(false);
+                alert("✅ Import ke Firebase berhasil!");
+                renderTeacherDashboard();
+                closeModal('importModal');
+            } catch(err) {
+                showLoading(false);
+                alert("❌ File tidak valid!\n" + err.message);
+            }
+        };
+        reader.readAsText(file);
+    }
+
+    // ==========================================
+    // QR CODE & SHARE
+    // ==========================================
+    function generateShareQR() {
+        const url = window.location.href.split('?')[0];
+        document.getElementById('qrcode').innerHTML = "";
+        new QRCode(document.getElementById("qrcode"), {
+            text: url, width: 200, height: 200,
+            colorDark: "#000000", colorLight: "#ffffff",
+            correctLevel: QRCode.CorrectLevel.H
+        });
+        document.getElementById('shareLinkDisplay').innerHTML = `
+            <p style="margin-top:8px"><a href="${url}" target="_blank">${url}</a></p>
+            <p class="small" style="margin-top:4px">🔥 Siswa scan QR ini → buka web → login → langsung bisa ujian!</p>`;
+        document.getElementById('qrModal').style.display = 'flex';
+    }
+
+    function copyShareLink() {
+        const url = window.location.href.split('?')[0];
+        navigator.clipboard.writeText(url);
+        alert("🔗 Link web berhasil disalin!\nKirim ke siswa untuk akses ujian.");
+    }
+
+    function shareViaWA() {
+        const url = window.location.href.split('?')[0];
+        const text = `📚 *CBT Ujian Harian XI TJKT 2*\n\nBuka link berikut untuk mengerjakan ujian:\n${url}\n\n*Powered by Firebase - Data sync realtime!*`;
+        window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+    }
+
+    function generateSingleLoginQR(username, password) {
+        const loginData = { type: "login", username, password, timestamp: Date.now() };
+        const encodedData = btoa(encodeURIComponent(JSON.stringify(loginData)));
+        const loginUrl = window.location.href.split('?')[0].split('#')[0] + '?autologin=' + encodedData;
+        document.getElementById('qrcode').innerHTML = "";
+        new QRCode(document.getElementById("qrcode"), {
+            text: loginUrl, width: 200, height: 200,
+            colorDark: "#000000", colorLight: "#ffffff",
+            correctLevel: QRCode.CorrectLevel.H
+        });
+        document.getElementById('shareLinkDisplay').innerHTML = `<small class="small">QR Login untuk: <b>${username}</b></small>`;
+        document.getElementById('qrModal').style.display = 'flex';
+    }
+
+    function openQRLoginMenu() {
+        const container = document.getElementById('qrStudentList');
+        let html = '';
+        students.forEach(s => {
+            html += `<div style="margin:10px 0; padding:10px; background:#f0f0f0; border-radius:8px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap;">
+                        <span><b>${escapeHtml(s.name)}</b> (${s.username})</span>
+                        <button class="btn-small btn-add" onclick="generateSingleLoginQR('${s.username}', '${s.password}'); closeModal('qrLoginMenuModal');">🎟️ Buat QR Login</button>
+                     </div>`;
+        });
+        container.innerHTML = html || '<p class="small">Belum ada siswa terdaftar.</p>';
+        document.getElementById('qrLoginMenuModal').style.display = 'flex';
+    }
+
+    function closeQRModal() { document.getElementById('qrModal').style.display = 'none'; }
+    function closeModal(modalId) { document.getElementById(modalId).style.display = 'none'; }
+    function openAddSubjectModal() { document.getElementById('addSubjectModal').style.display = 'flex'; }
+    function openAddStudentModal() { document.getElementById('addStudentModal').style.display = 'flex'; }
+    function openImportModal() { document.getElementById('importModal').style.display = 'flex'; }
+    function closeCameraModal() { document.getElementById('cameraModal').style.display = 'none'; }
+
+    // ==========================================
+    // QR SCANNER
+    // ==========================================
+    function openQRScanner() {
+        const modal = document.getElementById('qrScannerModal');
+        modal.style.display = 'flex';
+        document.getElementById('qr-reader').innerHTML = "";
+        html5QrCode = new Html5Qrcode("qr-reader");
+        html5QrCode.start(
+            { facingMode: "environment" },
+            { fps: 10, qrbox: { width: 250, height: 250 } },
+            (decodedText) => {
+                html5QrCode.stop();
+                closeQRScannerModal();
+                try {
+                    if (decodedText.includes('autologin=')) {
+                        const encodedData = new URLSearchParams(decodedText.split('?')[1]).get('autologin');
+                        if (encodedData) {
+                            const jsonStr = decodeURIComponent(atob(encodedData));
+                            const loginData = JSON.parse(jsonStr);
+                            if (loginData.type === "login") performLoginViaQR(loginData.username, loginData.password);
+                            else alert("QR Code tidak valid!");
+                        }
+                    } else {
+                        alert("QR Code bukan untuk login!");
+                    }
+                } catch(e) { alert("QR Code tidak valid!"); }
+            },
+            () => {}
+        ).catch(err => {
+            alert("Gagal mengakses kamera untuk scan QR!");
+        });
+    }
+
+    function closeQRScannerModal() {
+        document.getElementById('qrScannerModal').style.display = 'none';
+        if (html5QrCode) html5QrCode.stop().catch(() => {});
+    }
+
+    // ==========================================
+    // ANTI-CHEAT & SUARA
+    // ==========================================
+    function playShameSound(message) {
+        if ('speechSynthesis' in window) {
+            const utterance = new SpeechSynthesisUtterance(message);
+            utterance.lang = 'id-ID'; utterance.rate = 1.1; utterance.pitch = 1.2; utterance.volume = 1;
+            window.speechSynthesis.cancel();
+            window.speechSynthesis.speak(utterance);
+        }
+        try {
+            const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            const oscillator = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            oscillator.connect(gainNode); gainNode.connect(audioCtx.destination);
+            oscillator.frequency.value = 880; gainNode.gain.value = 0.5;
+            oscillator.start();
+            gainNode.gain.exponentialRampToValueAtTime(0.00001, audioCtx.currentTime + 1);
+            oscillator.stop(audioCtx.currentTime + 0.8);
+        } catch(e) {}
+    }
+
+    function shameOnYou(reason) {
+        const examPage = document.getElementById('examPage');
+        if (examPage && examPage.style.display !== 'none') {
+            cheatWarningCount++;
+            examPage.classList.add('shame-effect');
+            setTimeout(() => examPage.classList.remove('shame-effect'), 1500);
+            const toast = document.createElement('div');
+            toast.className = 'shame-toast';
+            toast.innerHTML = `🚨 ${reason} 🚨<br>📢 MALU SAMA TEMAN-TEMAN! Jangan curang!`;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 4000);
+            let msg = "Halo! Kamu ketahuan berbuat curang. Ayo ujian dengan jujur!";
+            if (reason.includes("keluar") || reason.includes("tab")) msg = "Perhatian! Anda mencoba keluar dari halaman ujian. Ini tindakan curang! Maluuu!";
+            else if (reason.includes("klik kanan")) msg = "Hei! Jangan klik kanan ya. Yang jujur dong!";
+            else if (reason.includes("copy") || reason.includes("paste")) msg = "Waduh, mau copy-paste ya? Hanya yang jujur yang sukses!";
+            playShameSound(msg);
+            captureAndSave("KETAHUAN CURANG: " + reason);
+        }
+    }
+
+    document.addEventListener('visibilitychange', function() {
+        if (document.hidden) {
+            cheatWarningCount++;
+            shameOnYou("⚠️ KAMU KELUAR DARI HALAMAN UJIAN");
+            if (cheatWarningCount >= 3) { alert("Anda sudah 3x keluar halaman! Ujian akan dikirim paksa."); submitExam(); }
+        }
+    });
+    document.addEventListener('contextmenu', function(e) {
+        const ep = document.getElementById('examPage');
+        if (ep && ep.style.display !== 'none') { e.preventDefault(); shameOnYou("🚫 Klik kanan tidak diperbolehkan!"); return false; }
+    });
+    document.addEventListener('copy', function(e) {
+        const ep = document.getElementById('examPage');
+        if (ep && ep.style.display !== 'none') { shameOnYou("📋 COPY DETECTED!"); e.preventDefault(); }
+    });
+    document.addEventListener('paste', function(e) {
+        const ep = document.getElementById('examPage');
+        if (ep && ep.style.display !== 'none') { shameOnYou("📋 PASTE DETECTED!"); e.preventDefault(); }
+    });
+    document.addEventListener('keydown', function(e) {
+        const ep = document.getElementById('examPage');
+        if (ep && ep.style.display !== 'none') {
+            if (e.key === 'F12') { e.preventDefault(); shameOnYou("🔧 Mencoba buka Developer Tools!"); }
+            if (e.ctrlKey && e.shiftKey && ['I','J','C'].includes(e.key)) { e.preventDefault(); shameOnYou("🔧 Mencoba buka Developer Tools!"); }
+            if (e.ctrlKey && e.key === 'u') { e.preventDefault(); shameOnYou("🔧 Mencoba lihat source code!"); }
+        }
+    });
+
+    // ==========================================
+    // KAMERA
+    // ==========================================
+    async function requestCameraPermission() {
+        try {
+            const statusDiv = document.getElementById('cameraStatus');
+            if (statusDiv) statusDiv.innerHTML = "📷 Meminta izin kamera...";
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+            if (cameraStream) cameraStream.getTracks().forEach(t => t.stop());
+            cameraStream = stream;
+            videoElement = document.getElementById('video');
+            if (videoElement) { videoElement.srcObject = stream; videoElement.style.display = 'block'; }
+            const startBtn = document.getElementById('startCameraBtn');
+            if (startBtn) startBtn.style.display = 'none';
+            if (statusDiv) statusDiv.innerHTML = "✅ Kamera aktif";
+            isCameraReady = true;
+        } catch(err) {
+            const statusDiv = document.getElementById('cameraStatus');
+            if (statusDiv) statusDiv.innerHTML = "❌ Gagal akses kamera.";
+            isCameraReady = false;
+        }
+    }
+
+    function stopCamera() {
+        if (cameraInterval) { clearInterval(cameraInterval); cameraInterval = null; }
+        if (cameraStream) { cameraStream.getTracks().forEach(t => t.stop()); cameraStream = null; }
+        isCameraReady = false;
+    }
+
+    function takePhoto() {
+        if (!videoElement || !videoElement.videoWidth || !isCameraReady) return null;
+        const canvas = document.createElement('canvas');
+        canvas.width = videoElement.videoWidth; canvas.height = videoElement.videoHeight;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
+        ctx.font = "14px Arial"; ctx.fillStyle = "white"; ctx.shadowColor = "black";
+        ctx.fillText(new Date().toLocaleString('id-ID'), 10, 30);
+        ctx.fillText(currentUser?.name || "", 10, 55);
+        return canvas.toDataURL('image/jpeg', 0.7);
+    }
+
+    function captureAndSave(reason = "Otomatis") {
+        const photoData = takePhoto();
+        if (photoData && currentUser && currentSubject && isCameraReady) {
+            let cameraPhotos = JSON.parse(localStorage.getItem('cameraPhotos') || '[]');
+            cameraPhotos.push({ id: Date.now(), siswa: currentUser.username, namaSiswa: currentUser.name, mapel: currentSubject.name, waktu: new Date().toISOString(), reason, image: photoData });
+            if (cameraPhotos.length > 100) cameraPhotos.shift();
+            localStorage.setItem('cameraPhotos', JSON.stringify(cameraPhotos));
+        }
+    }
+
+    function startCameraCapture() {
+        if (cameraInterval) clearInterval(cameraInterval);
+        setTimeout(() => captureAndSave("Mulai ujian"), 2000);
+        cameraInterval = setInterval(() => {
+            const ep = document.getElementById('examPage');
+            if (currentSubject && ep && ep.style.display !== 'none' && isCameraReady) captureAndSave("Otomatis 30 detik");
+        }, 30000);
+    }
+
+    // ==========================================
+    // UTILITY
+    // ==========================================
+    function escapeHtml(str) {
+        if (!str) return '';
+        return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+    }
+
+    // Auto login via URL
+    (function checkUrlForAutoLogin() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const autoLoginData = urlParams.get('autologin');
+        if (autoLoginData) {
+            try {
+                const jsonStr = decodeURIComponent(atob(autoLoginData));
+                const loginData = JSON.parse(jsonStr);
+                if (loginData.type === "login" && loginData.username && loginData.password) {
+                    window.history.replaceState({}, document.title, window.location.pathname);
+                    window.addEventListener('firebaseReady', () => {
+                        setTimeout(() => performLoginViaQR(loginData.username, loginData.password), 500);
+                    });
+                }
+            } catch(e) { console.log("Auto login failed", e); }
+        }
+    })();
+
+    console.log("🔥 CBT Ujian Harian XI TJKT 2 - Firebase Edition siap!");
+</script>
+</body>
+</html>
